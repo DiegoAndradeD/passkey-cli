@@ -1,7 +1,11 @@
+/*
+Copyright © 2025 NAME HERE <EMAIL ADDRESS>
+
+*/
 package main
 
-import "fmt"
+import "github.com/DiegoAndradeD/passkey-cli/cmd"
 
 func main() {
-	fmt.Println("passkey-cli initialized")
+	cmd.Execute()
 }
