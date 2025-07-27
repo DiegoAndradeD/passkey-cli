@@ -7,9 +7,9 @@ import (
 	"errors"
 	"log"
 	"os"
-	"os/user"
 	"path/filepath"
 
+	"github.com/DiegoAndradeD/passkey-cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -28,16 +28,6 @@ to quickly create a Cobra application.`,
 	},
 }
 
-func getVaultPath() string {
-	currentUser, err := user.Current()
-	if err != nil {
-		log.Fatal("Error in getting user: ", err)
-	}
-
-	path := filepath.Join(currentUser.HomeDir, ".config", "passkey-cli", "vault.json")
-	return path
-}
-
 func isVaultCreated(vaultPath string) bool {
 	_, err := os.Stat(vaultPath)
 	if err == nil {
@@ -51,7 +41,7 @@ func isVaultCreated(vaultPath string) bool {
 }
 
 func getOrCreateVault() {
-	vaultPath := getVaultPath()
+	vaultPath := utils.GetVaultPath()
 
 	vaultAlreadyExists := isVaultCreated(vaultPath)
 
@@ -66,11 +56,13 @@ func getOrCreateVault() {
 		log.Fatal("Failed to create directories: ", err)
 	}
 
-	_, err = os.Create(vaultPath)
+	vault, err := os.Create(vaultPath)
 	if err != nil {
 		log.Fatal("Failed to create vault file: ", err)
 	}
-
+	defer vault.Close()
+	_, err = vault.WriteString("[]")
+	utils.HandleError(err)
 	log.Println("Vault has been created successfully")
 }
 
