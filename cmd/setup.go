@@ -1,6 +1,3 @@
-/*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
@@ -13,16 +10,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// setupCmd represents the setup command
 var setupCmd = &cobra.Command{
 	Use:   "setup",
 	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Long: `The "setup" command initializes the local vault used to securely store
+service credentials and generated passwords.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+When you run this command, it will:
+  • Check if a vault already exists in your user configuration directory.
+  • If no vault exists, it creates the necessary directories and an empty vault file.
+  • If a vault already exists, it leaves it unchanged.
+
+Usage:
+  passkey-cli setup
+
+Examples:
+  passkey-cli setup
+    Initializes the vault if it doesn't already exist.
+
+After running this command successfully, your CLI will be ready to store
+services and generated passwords using other commands such as "add".`,
 	Run: func(cmd *cobra.Command, args []string) {
 		getOrCreateVault()
 	},
@@ -68,14 +75,4 @@ func getOrCreateVault() {
 
 func init() {
 	rootCmd.AddCommand(setupCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// setupCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// setupCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

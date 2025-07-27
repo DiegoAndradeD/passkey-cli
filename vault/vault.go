@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+var ErrServiceNotFound = errors.New("service not found")
+
 type Service struct {
 	Name      string    `json:"name"`
 	Password  string    `json:"password"`
@@ -52,4 +54,23 @@ func (v *Vault) Save() error {
 func (v *Vault) AddService(service Service) error {
 	v.Services = append(v.Services, service)
 	return v.Save()
+}
+
+func (v *Vault) GetServices() ([]Service, error) {
+	if err := v.Load(); err != nil {
+		return nil, err
+	}
+	return v.Services, nil
+}
+
+func (v *Vault) GetService(name string) (Service, error) {
+	if err := v.Load(); err != nil {
+		return Service{}, err
+	}
+	for i := range v.Services {
+		if v.Services[i].Name == name {
+			return v.Services[i], nil
+		}
+	}
+	return Service{}, ErrServiceNotFound
 }

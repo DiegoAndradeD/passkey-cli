@@ -1,6 +1,3 @@
-/*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
@@ -12,11 +9,24 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// addCmd represents the add command
 var addCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Adds a new service with automatically generated password",
-	Long:  ``,
+	Long: `The "add" command allows you to register a new service in your secure vault.
+It automatically generates a strong random password, associates it with the
+specified service name, and stores it in the encrypted vault file.
+
+Usage:
+passkey-cli add --name <service_name>
+
+Examples:
+passkey-cli add --name github
+passkey-cli add -n "my-database"
+
+After running this command, the service and its generated password will be
+saved securely in your vault file. You can later retrieve or manage it using
+other commands provided by the CLI.`,
+
 	Run: func(cmd *cobra.Command, args []string) {
 		name, err := cmd.Flags().GetString("name")
 		if err != nil || name == "" {
@@ -28,8 +38,8 @@ var addCmd = &cobra.Command{
 
 func createService(name string) {
 	vaultPath := utils.GetVaultPath()
-	newVault := vault.NewVault(vaultPath)
-	if err := newVault.Load(); err != nil {
+	v := vault.NewVault(vaultPath)
+	if err := v.Load(); err != nil {
 		log.Fatal("Failed to load vault", err)
 	}
 
@@ -43,7 +53,7 @@ func createService(name string) {
 		Password:  password,
 		CreatedAt: time.Now(),
 	}
-	if err := newVault.AddService(service); err != nil {
+	if err := v.AddService(service); err != nil {
 		log.Fatal("Failed to save vault", err)
 	}
 	log.Printf("Service %q added successfully!\n", name)
@@ -53,13 +63,4 @@ func init() {
 	rootCmd.AddCommand(addCmd)
 
 	addCmd.Flags().StringP("name", "n", "", "Service name")
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// addCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// addCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
