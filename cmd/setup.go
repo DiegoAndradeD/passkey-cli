@@ -4,9 +4,9 @@ import (
 	"errors"
 	"log"
 	"os"
-	"path/filepath"
 
 	"github.com/DiegoAndradeD/passkey-cli/utils"
+	"github.com/DiegoAndradeD/passkey-cli/vault"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +31,11 @@ Examples:
 After running this command successfully, your CLI will be ready to store
 services and generated passwords using other commands such as "add".`,
 	Run: func(cmd *cobra.Command, args []string) {
-		getOrCreateVault()
+		passkey, err := cmd.Flags().GetString("passkey")
+		if err != nil || passkey == "" {
+			log.Fatal("the passkey must be specified with --passkey")
+		}
+		getOrCreateVault(passkey)
 	},
 }
 
@@ -47,7 +51,7 @@ func isVaultCreated(vaultPath string) bool {
 	return false
 }
 
-func getOrCreateVault() {
+func getOrCreateVault(passkey string) {
 	vaultPath := utils.GetVaultPath()
 
 	vaultAlreadyExists := isVaultCreated(vaultPath)
@@ -57,22 +61,16 @@ func getOrCreateVault() {
 		return
 	}
 
-	vaultDir := filepath.Dir(vaultPath)
-	err := os.MkdirAll(vaultDir, 0700)
-	if err != nil {
-		log.Fatal("Failed to create directories: ", err)
-	}
+	hash, _ := utils.HashPasskey(passkey)
+	v := vault.NewVault(hash)
 
-	vault, err := os.Create(vaultPath)
-	if err != nil {
-		log.Fatal("Failed to create vault file: ", err)
+	if err := vault.SaveVault(vaultPath, v); err != nil {
+
 	}
-	defer vault.Close()
-	_, err = vault.WriteString("[]")
-	utils.HandleError(err)
-	log.Println("Vault has been created successfully")
 }
 
 func init() {
 	rootCmd.AddCommand(setupCmd)
+	setupCmd.Flags().StringP("passkey", "p", "", "Your passkey")
+
 }

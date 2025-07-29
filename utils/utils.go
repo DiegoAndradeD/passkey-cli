@@ -2,9 +2,12 @@ package utils
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"log"
 	"math/big"
 	"strings"
+
+	"golang.org/x/crypto/argon2"
 )
 
 const (
@@ -13,13 +16,6 @@ const (
 )
 
 func GetVaultPath() string {
-	// home, err := os.UserHomeDir()
-	// if err != nil {
-	// 	log.Fatal("Could not get user's home directory: ", err)
-	// }
-	// return filepath.Join(home, ".config", "passkey-cli", "vault.json")
-
-	// Test Path
 	return "vault.json"
 }
 
@@ -39,4 +35,23 @@ func GeneratePassword() (string, error) {
 		password.WriteByte(passwordChars[index.Int64()])
 	}
 	return password.String(), nil
+}
+
+func HashPasskey(password string) (string, []byte) {
+	salt := make([]byte, 16)
+	if _, err := rand.Read(salt); err != nil {
+		log.Fatal(err)
+	}
+	hash := argon2.IDKey([]byte(password), salt, 1, 64*1024, 4, 32)
+	encoded := base64.RawStdEncoding.EncodeToString(append(salt, hash...))
+	return encoded, salt
+}
+
+func VerifyPassword(encoded, password string) bool {
+	data, _ := base64.RawStdEncoding.DecodeString(encoded)
+	salt := data[:16]
+	hash := data[16:]
+
+	newHash := argon2.IDKey([]byte(password), salt, 1, 64*1024, 4, 32)
+	return string(hash) == string(newHash)
 }

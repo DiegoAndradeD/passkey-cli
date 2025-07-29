@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/DiegoAndradeD/passkey-cli/utils"
 )
 
 var ErrServiceNotFound = errors.New("service not found")
@@ -17,59 +19,82 @@ type Service struct {
 }
 
 type Vault struct {
-	Path     string
-	Services []Service
+	PasskeyHash string    `json:"passkey_hash"`
+	Services    []Service `json:"services"`
 }
 
-func NewVault(path string) *Vault {
+func NewVault(passkeyHash string) *Vault {
 	return &Vault{
-		Path: path,
+		PasskeyHash: passkeyHash,
+		Services:    []Service{},
 	}
 }
 
-func (v *Vault) Load() error {
-	data, err := os.ReadFile(v.Path)
+func LoadVault(path string, passkey string) (*Vault, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			v.Services = []Service{}
-			return nil
+			return nil, errors.New("vault does not exist, please setup")
 		}
-		return err
+		return nil, err
 	}
-	return json.Unmarshal(data, &v.Services)
+
+	var vault Vault
+	if err := json.Unmarshal(data, &vault); err != nil {
+		return nil, err
+	}
+
+	if vault.PasskeyHash == "" {
+		return nil, errors.New("vault is not initialized")
+	}
+
+	if !utils.VerifyPassword(vault.PasskeyHash, passkey) {
+		return nil, errors.New("invalid passkey")
+	}
+
+	return &vault, nil
 }
 
-func (v *Vault) Save() error {
-	data, err := json.MarshalIndent(v.Services, "", " ")
+func SaveVault(path string, vault *Vault) error {
+	data, err := json.MarshalIndent(vault, "", "  ")
 	if err != nil {
 		return err
 	}
-	dir := filepath.Dir(v.Path)
+
+	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
-	return os.WriteFile(v.Path, data, 0600)
+
+	return os.WriteFile(path, data, 0600)
 }
 
-func (v *Vault) AddService(service Service) error {
-	v.Services = append(v.Services, service)
-	return v.Save()
+func AddService(path string, service Service, passkey string) error {
+	vault, err := LoadVault(path, passkey)
+	if err != nil {
+		return err
+	}
+
+	vault.Services = append(vault.Services, service)
+	return SaveVault(path, vault)
 }
 
-func (v *Vault) GetServices() ([]Service, error) {
-	if err := v.Load(); err != nil {
+func GetServices(path, passkey string) ([]Service, error) {
+	vault, err := LoadVault(path, passkey)
+	if err != nil {
 		return nil, err
 	}
-	return v.Services, nil
+	return vault.Services, nil
 }
 
-func (v *Vault) GetService(name string) (Service, error) {
-	if err := v.Load(); err != nil {
+func GetService(path, name, passkey string) (Service, error) {
+	vault, err := LoadVault(path, passkey)
+	if err != nil {
 		return Service{}, err
 	}
-	for i := range v.Services {
-		if v.Services[i].Name == name {
-			return v.Services[i], nil
+	for _, s := range vault.Services {
+		if s.Name == name {
+			return s, nil
 		}
 	}
 	return Service{}, ErrServiceNotFound

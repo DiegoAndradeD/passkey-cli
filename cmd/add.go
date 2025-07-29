@@ -9,6 +9,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func init() {
+	rootCmd.AddCommand(addCmd)
+
+	addCmd.Flags().StringP("name", "n", "", "Service name")
+	addCmd.Flags().StringP("passkey", "p", "", "Vault passkey")
+
+}
+
 var addCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Adds a new service with automatically generated password",
@@ -32,20 +40,26 @@ other commands provided by the CLI.`,
 		if err != nil || name == "" {
 			log.Fatal("the service name must be specified with --name", err)
 		}
-		createService(name)
+		passkey, err := cmd.Flags().GetString("passkey")
+		if err != nil || passkey == "" {
+			log.Fatal("you must specify the passkey with --passkey flag")
+		}
+		createService(name, passkey)
 	},
 }
 
-func createService(name string) {
+func createService(name, passkey string) {
+
 	vaultPath := utils.GetVaultPath()
-	v := vault.NewVault(vaultPath)
-	if err := v.Load(); err != nil {
-		log.Fatal("Failed to load vault", err)
+
+	v, err := vault.LoadVault(vaultPath, passkey)
+	if err != nil {
+		log.Fatalf("failed to load vault: %v", err)
 	}
 
 	password, err := utils.GeneratePassword()
 	if err != nil {
-		log.Fatal("Failed to generate password", err)
+		log.Fatalf("failed to generate password: %v", err)
 	}
 
 	service := vault.Service{
@@ -53,14 +67,13 @@ func createService(name string) {
 		Password:  password,
 		CreatedAt: time.Now(),
 	}
-	if err := v.AddService(service); err != nil {
-		log.Fatal("Failed to save vault", err)
+
+	v.Services = append(v.Services, service)
+
+	err = vault.SaveVault(vaultPath, v)
+	if err != nil {
+		log.Fatalf("failed to save vault: %v", err)
 	}
-	log.Printf("Service %q added successfully!\n", name)
-}
 
-func init() {
-	rootCmd.AddCommand(addCmd)
-
-	addCmd.Flags().StringP("name", "n", "", "Service name")
+	log.Printf("Service '%s' added successfully.", name)
 }

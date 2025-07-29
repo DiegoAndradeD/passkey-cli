@@ -1,9 +1,9 @@
 package cmd
 
 import (
-	"encoding/json"
-	"fmt"
+	"errors"
 	"log"
+	"time"
 
 	"github.com/DiegoAndradeD/passkey-cli/utils"
 	"github.com/DiegoAndradeD/passkey-cli/vault"
@@ -33,44 +33,55 @@ and retrieve details about individual services without modifying any data.`,
 		if err != nil {
 			log.Fatal(err)
 		}
+		passkey, err := cmd.Flags().GetString("passkey")
+		if err != nil || passkey == "" {
+			log.Fatal("you must specify the passkey with --passkey flag")
+		}
 		if service == "" {
-			listAllServices()
+			listAllServices(passkey)
 		} else {
-			listServiceByName(service)
+			listServiceByName(service, passkey)
 		}
 
 	},
 }
 
-func listAllServices() {
+func listAllServices(passkey string) {
 	vaultPath := utils.GetVaultPath()
-	v := vault.NewVault(vaultPath)
-	services, err := v.GetServices()
+
+	services, err := vault.GetServices(vaultPath, passkey)
 	if err != nil {
-		log.Fatal("Failed to load vault services", err)
+		log.Fatalf("failed to get services: %v", err)
 	}
-	output, err := json.MarshalIndent(services, "", " ")
-	if err != nil {
-		log.Fatal(err)
+
+	if len(services) == 0 {
+		log.Println("No services found in the vault.")
+		return
 	}
-	fmt.Println(string(output))
+
+	log.Println("Services stored in vault:")
+	for _, s := range services {
+		log.Printf("- %s (created at: %s)", s.Name, s.CreatedAt.Format(time.RFC1123))
+	}
 }
 
-func listServiceByName(name string) {
+func listServiceByName(name, passkey string) {
 	vaultPath := utils.GetVaultPath()
-	v := vault.NewVault(vaultPath)
-	service, err := v.GetService(name)
+
+	service, err := vault.GetService(vaultPath, name, passkey)
 	if err != nil {
-		log.Fatal("Failed to load service", err)
+		if errors.Is(err, vault.ErrServiceNotFound) {
+			log.Printf("Service '%s' not found in the vault.", name)
+			return
+		}
+		log.Fatalf("failed to get service: %v", err)
 	}
-	output, err := json.MarshalIndent(service, "", " ")
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(string(output))
+
+	log.Printf("Service: %s\nPassword: %s\nCreated At: %s\n", service.Name, service.Password, service.CreatedAt.Format(time.RFC1123))
 }
 
 func init() {
 	rootCmd.AddCommand(listCmd)
 	listCmd.Flags().StringP("service", "s", "", "Service name")
+	listCmd.Flags().StringP("passkey", "p", "", "Vault passkey")
 }
