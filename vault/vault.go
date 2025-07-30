@@ -12,8 +12,9 @@ import (
 	"github.com/DiegoAndradeD/passkey-cli/utils"
 )
 
-var ErrServiceNotFound = errors.New("Service not found")
-var ErrVaultAlreadyExists = errors.New("Vault already exists")
+var ErrServiceNotFound = errors.New("service not found")
+var ErrVaultAlreadyExists = errors.New("vault already exists")
+var ErrCopyToClipboardFailed = errors.New("failed to copy to clipboard")
 
 type Service struct {
 	Name      string    `json:"name"`
@@ -142,4 +143,31 @@ func GetService(path, name, passkey string) (Service, error) {
 		}
 	}
 	return Service{}, ErrServiceNotFound
+}
+
+func CopyServicePassword(path, name, passkey string) error {
+	vault, err := LoadVault(path, passkey)
+	if err != nil {
+		return err
+	}
+	fmt.Println(path, name, passkey)
+	fmt.Println(vault.Services)
+	var password string
+	found := false
+	for _, s := range vault.Services {
+		if s.Name == name {
+			password = s.Password
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("service %q not found", name)
+	}
+	if err := utils.CopyToClipboard(password); err != nil {
+		return fmt.Errorf("copy to clipboard failed: %w", err)
+	}
+	fmt.Println("Copied to clipboard!")
+	return nil
+
 }
