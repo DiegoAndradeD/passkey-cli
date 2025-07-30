@@ -15,6 +15,7 @@ import (
 var ErrServiceNotFound = errors.New("service not found")
 var ErrVaultAlreadyExists = errors.New("vault already exists")
 var ErrCopyToClipboardFailed = errors.New("failed to copy to clipboard")
+var ErrServiceAlreadyExists = errors.New("service already is registered within vault")
 
 type Service struct {
 	Name      string    `json:"name"`
@@ -94,7 +95,10 @@ func AddService(path string, name string, passkey string) error {
 		CreatedAt: time.Now(),
 	}
 
-	vault.Services = append(vault.Services, service)
+	vault.Services, err = appendUniqueService(vault.Services, service)
+	if err != nil {
+		return err
+	}
 
 	if err := SaveVault(path, vault); err != nil {
 		return fmt.Errorf("failed to save vault: %w", err)
@@ -124,6 +128,47 @@ func DeleteService(path, serviceName, passkey string) error {
 	return SaveVault(path, vault)
 }
 
+func UpdateService(path, oldName, newName, passkey string, regeneratePassword bool) error {
+	vault, err := LoadVault(path, passkey)
+	if err != nil {
+		return fmt.Errorf("failed to load vault: %w", err)
+	}
+
+	index := -1
+	for i, s := range vault.Services {
+		if s.Name == oldName {
+			index = i
+			break
+		}
+	}
+	if index == -1 {
+		return ErrServiceNotFound
+	}
+
+	if oldName != newName {
+		for _, s := range vault.Services {
+			if s.Name == newName {
+				return ErrServiceAlreadyExists
+			}
+		}
+		vault.Services[index].Name = newName
+	}
+
+	if regeneratePassword {
+		newPass, err := utils.GeneratePassword()
+		if err != nil {
+			return fmt.Errorf("failed to generate password: %w", err)
+		}
+		vault.Services[index].Password = newPass
+	}
+
+	if err := SaveVault(path, vault); err != nil {
+		return fmt.Errorf("failed to save vault: %w", err)
+	}
+
+	return nil
+}
+
 func GetServices(path, passkey string) ([]Service, error) {
 	vault, err := LoadVault(path, passkey)
 	if err != nil {
@@ -146,28 +191,27 @@ func GetService(path, name, passkey string) (Service, error) {
 }
 
 func CopyServicePassword(path, name, passkey string) error {
-	vault, err := LoadVault(path, passkey)
+	service, err := GetService(path, name, passkey)
 	if err != nil {
 		return err
 	}
-	fmt.Println(path, name, passkey)
-	fmt.Println(vault.Services)
-	var password string
-	found := false
-	for _, s := range vault.Services {
-		if s.Name == name {
-			password = s.Password
-			found = true
-			break
-		}
-	}
-	if !found {
+	if service == (Service{}) {
 		return fmt.Errorf("service %q not found", name)
 	}
-	if err := utils.CopyToClipboard(password); err != nil {
+
+	if err := utils.CopyToClipboard(service.Password); err != nil {
 		return fmt.Errorf("copy to clipboard failed: %w", err)
 	}
+
 	fmt.Println("Copied to clipboard!")
 	return nil
+}
 
+func appendUniqueService(services []Service, newService Service) ([]Service, error) {
+	for _, s := range services {
+		if s.Name == newService.Name {
+			return services, ErrServiceAlreadyExists
+		}
+	}
+	return append(services, newService), nil
 }
