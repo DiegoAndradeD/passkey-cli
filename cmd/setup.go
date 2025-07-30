@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"os"
 
@@ -30,12 +31,13 @@ Examples:
 
 After running this command successfully, your CLI will be ready to store
 services and generated passwords using other commands such as "add".`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		passkey, err := cmd.Flags().GetString("passkey")
 		if err != nil || passkey == "" {
-			log.Fatal("the passkey must be specified with --passkey")
+			return err
 		}
 		getOrCreateVault(passkey)
+		return nil
 	},
 }
 
@@ -51,22 +53,23 @@ func isVaultCreated(vaultPath string) bool {
 	return false
 }
 
-func getOrCreateVault(passkey string) {
+func getOrCreateVault(passkey string) error {
 	vaultPath := utils.GetVaultPath()
 
 	vaultAlreadyExists := isVaultCreated(vaultPath)
 
 	if vaultAlreadyExists {
-		log.Println("Vault already exists")
-		return
+		return vault.ErrVaultAlreadyExists
 	}
 
 	hash, _ := utils.HashPasskey(passkey)
 	v := vault.NewVault(hash)
 
 	if err := vault.SaveVault(vaultPath, v); err != nil {
-
+		return fmt.Errorf("failed to save vault: %w", err)
 	}
+	log.Println("Vault created successfully.")
+	return nil
 }
 
 func init() {

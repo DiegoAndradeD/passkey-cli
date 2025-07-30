@@ -23,8 +23,8 @@ Usage:
   passkey-cli list --name github  # Shows details only for the 'github' service
 
 Examples:
-  passkey-cli list
-  passkey-cli list --name "my-database"
+  passkey-cli list --passkey password
+  passkey-cli list --name "my-database -p password"
 
 This command is useful to quickly check which services are stored in your vault
 and retrieve details about individual services without modifying any data.`,

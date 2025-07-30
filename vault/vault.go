@@ -3,14 +3,17 @@ package vault
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/DiegoAndradeD/passkey-cli/utils"
 )
 
-var ErrServiceNotFound = errors.New("service not found")
+var ErrServiceNotFound = errors.New("Service not found")
+var ErrVaultAlreadyExists = errors.New("Vault already exists")
 
 type Service struct {
 	Name      string    `json:"name"`
@@ -47,8 +50,12 @@ func LoadVault(path string, passkey string) (*Vault, error) {
 	if vault.PasskeyHash == "" {
 		return nil, errors.New("vault is not initialized")
 	}
+	valid, err := utils.VerifyPassword(vault.PasskeyHash, passkey)
 
-	if !utils.VerifyPassword(vault.PasskeyHash, passkey) {
+	if err != nil {
+		return nil, fmt.Errorf("could not verify passkey: %w", err)
+	}
+	if !valid {
 		return nil, errors.New("invalid passkey")
 	}
 
@@ -69,13 +76,50 @@ func SaveVault(path string, vault *Vault) error {
 	return os.WriteFile(path, data, 0600)
 }
 
-func AddService(path string, service Service, passkey string) error {
+func AddService(path string, name string, passkey string) error {
+	vault, err := LoadVault(path, passkey)
+	if err != nil {
+		return fmt.Errorf("failed to load vault: %w", err)
+	}
+
+	password, err := utils.GeneratePassword()
+	if err != nil {
+		return fmt.Errorf("failed to generate password: %w", err)
+	}
+
+	service := Service{
+		Name:      name,
+		Password:  password,
+		CreatedAt: time.Now(),
+	}
+
+	vault.Services = append(vault.Services, service)
+
+	if err := SaveVault(path, vault); err != nil {
+		return fmt.Errorf("failed to save vault: %w", err)
+	}
+
+	return nil
+}
+
+func DeleteService(path, serviceName, passkey string) error {
 	vault, err := LoadVault(path, passkey)
 	if err != nil {
 		return err
 	}
+	initialCount := len(vault.Services)
+	vault.Services = slices.DeleteFunc(vault.Services, func(s Service) bool {
+		return s.Name == serviceName
+	})
 
-	vault.Services = append(vault.Services, service)
+	if len(vault.Services) == initialCount {
+		return fmt.Errorf("service '%s' not found", serviceName)
+	}
+
+	if err := SaveVault(path, vault); err != nil {
+		return err
+	}
+
 	return SaveVault(path, vault)
 }
 
